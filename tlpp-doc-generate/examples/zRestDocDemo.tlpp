@@ -1,0 +1,191 @@
+#include "tlpp-core.th"
+#include "tlpp-rest.th"
+
+/*
+{Protheus.doc} Demo REST-DOC (OpenAPI)
+API de demonstracao "produtos" com annotations documentadas (title, params,
+responses) para o motor de documentacao REST do tlppCore.
+
+Fluxo: converter para CP1252 -> compilar -> subir REST -> chamar
+/demo/v1/doc/generate -> abrir o YAML gerado no Explorador OpenAPI:
+https://totvs.github.io/totvstec-doc/tools/explorador-openapi
+
+NOTA: este arquivo esta em UTF-8 (padrao do repositorio). O compilador
+Protheus exige CP1252 — converta antes de compilar. Ajuste a porta na
+chamada de tlpp.doc.generate (exemplo: 8080) para a porta REST do seu
+ambiente.
+
+@type function
+@since 22/07/2026
+*/
+
+//-------------------------------------------------------------------
+// Dados estaticos de demonstracao (sem acesso a banco)
+//-------------------------------------------------------------------
+static function getProdutos() as array
+    local aProds := {} as array
+    local jProd            as json
+
+    jProd := JsonObject():New()
+    jProd["id"]        := "000001"
+    jProd["descricao"] := "Teclado mecânico ABNT2"
+    jProd["categoria"] := "informatica"
+    jProd["preco"]     := 350.90
+    aAdd(aProds, jProd)
+
+    jProd := JsonObject():New()
+    jProd["id"]        := "000002"
+    jProd["descricao"] := "Monitor 27 polegadas 144Hz"
+    jProd["categoria"] := "informatica"
+    jProd["preco"]     := 1499.00
+    aAdd(aProds, jProd)
+
+    jProd := JsonObject():New()
+    jProd["id"]        := "000003"
+    jProd["descricao"] := "Cadeira ergonômica"
+    jProd["categoria"] := "escritorio"
+    jProd["preco"]     := 980.50
+    aAdd(aProds, jProd)
+
+return aProds
+
+//-------------------------------------------------------------------
+// GET /demo/v1/produtos  (colecao TTALK, filtro opcional por categoria)
+//-------------------------------------------------------------------
+@Get(;
+    endpoint="/demo/v1/produtos",;
+    title="Lista produtos",;
+    description="Retorna a coleção de produtos de demonstração no padrão TTALK, com filtro opcional por categoria.",;
+    params='[{"name":"categoria","description":"Filtra os produtos pela categoria informada (ex.: informatica, escritorio)","in":"query","type":"character","required":false}]',;
+    responses='[{"statusCode":200,"description":"Coleção de produtos (items, hasNext, remainingRecords)"}]';
+)
+user function zProdList() as logical
+    local jQuery := oRest:getQueryRequest() as json
+    local jResp  := JsonObject():New()      as json
+    local aProds := getProdutos()           as array
+    local aItems := {}                      as array
+    local cCateg := ""                      as character
+    local nI     := 0                       as numeric
+
+    if ( jQuery:hasProperty("categoria") )
+        cCateg := AllTrim(Lower(jQuery["categoria"]))
+    endif
+
+    for nI := 1 to Len(aProds)
+        if ( Empty(cCateg) .or. aProds[nI]["categoria"] == cCateg )
+            aAdd(aItems, aProds[nI])
+        endif
+    next nI
+
+    jResp["items"]            := aItems
+    jResp["hasNext"]          := .F.
+    jResp["remainingRecords"] := 0
+
+    oRest:setKeyHeaderResponse("Content-Type", "application/json")
+return oRest:setStatusResponse(200, jResp:toJson())
+
+//-------------------------------------------------------------------
+// GET /demo/v1/produtos/:id  (busca por path param)
+//-------------------------------------------------------------------
+@Get(;
+    endpoint="/demo/v1/produtos/:id",;
+    title="Consulta produto",;
+    description="Retorna um único produto a partir do código informado no path.",;
+    params='[{"name":"id","description":"Código do produto (6 dígitos)","in":"path","type":"character","required":true}]',;
+    responses='[{"statusCode":200,"description":"Produto encontrado"},{"statusCode":404,"description":"Produto não encontrado"}]';
+)
+user function zProdGet() as logical
+    local jPath  := oRest:getPathParamsRequest() as json
+    local aProds := getProdutos()                as array
+    local jErro                                  as json
+    local cId    := ""                           as character
+    local nI     := 0                            as numeric
+    local nPos   := 0                            as numeric
+
+    cId := AllTrim(jPath["id"])
+
+    for nI := 1 to Len(aProds)
+        if ( aProds[nI]["id"] == cId )
+            nPos := nI
+            exit
+        endif
+    next nI
+
+    oRest:setKeyHeaderResponse("Content-Type", "application/json")
+
+    if ( nPos == 0 )
+        jErro := JsonObject():New()
+        jErro["code"]            := "404"
+        jErro["message"]         := "Produto não encontrado"
+        jErro["detailedMessage"] := "Não existe produto com o id '" + cId + "' na base de demonstração."
+        return oRest:setStatusResponse(404, jErro:toJson())
+    endif
+
+return oRest:setStatusResponse(200, aProds[nPos]:toJson())
+
+//-------------------------------------------------------------------
+// POST /demo/v1/produtos  (criacao - eco do body com id gerado)
+//-------------------------------------------------------------------
+@Post(;
+    endpoint="/demo/v1/produtos",;
+    title="Cria produto",;
+    description="Cria um produto de demonstração. Recebe JSON com descricao, categoria e preco; retorna o produto criado com id gerado.",;
+    params='[{"name":"body","description":"JSON do produto: {descricao, categoria, preco}","in":"body","type":"json","required":true}]',;
+    responses='[{"statusCode":201,"description":"Produto criado"},{"statusCode":400,"description":"Body ausente ou JSON inválido"}]';
+)
+user function zProdPost() as logical
+    local cBody := oRest:getBodyRequest() as character
+    local jBody := JsonObject():New()     as json
+    local jErro                           as json
+    local cParse := ""                    as character
+
+    oRest:setKeyHeaderResponse("Content-Type", "application/json")
+
+    if ( !Empty(cBody) )
+        cParse := jBody:fromJson(cBody)
+    endif
+
+    if ( Empty(cBody) .or. !Empty(cParse) .or. !jBody:hasProperty("descricao") )
+        jErro := JsonObject():New()
+        jErro["code"]            := "400"
+        jErro["message"]         := "Requisição inválida"
+        jErro["detailedMessage"] := "Informe um JSON válido com ao menos a propriedade 'descricao'."
+        return oRest:setStatusResponse(400, jErro:toJson())
+    endif
+
+    jBody["id"] := StrZero(Randomize(1, 999999), 6)
+
+return oRest:setStatusResponse(201, jBody:toJson())
+
+//-------------------------------------------------------------------
+// GET /demo/v1/doc/generate  (dispara o motor REST-DOC do tlppCore)
+//-------------------------------------------------------------------
+@Get(;
+    endpoint="/demo/v1/doc/generate",;
+    title="Gera documentação OpenAPI",;
+    description="Executa tlpp.doc.generate e grava o YAML OpenAPI com todos os RESTs publicados na porta informada.",;
+    responses='[{"statusCode":200,"description":"Geração solicitada com sucesso"},{"statusCode":500,"description":"Falha na geração"}]';
+)
+user function zDocGen() as logical
+    local lOk   := .T.                as logical
+    local jResp := JsonObject():New() as json
+
+    begin sequence
+        // ajuste a porta para a porta REST do seu ambiente
+        tlpp.doc.generate("swagger", "api_doc", {8080}, {"pt-br"})
+    recover
+        lOk := .F.
+    end sequence
+
+    oRest:setKeyHeaderResponse("Content-Type", "application/json")
+
+    if ( lOk )
+        jResp["success"] := .T.
+        jResp["message"] := "Documentação OpenAPI gerada. Procure api_doc_<porta>.yaml em protheus_data\system."
+        return oRest:setStatusResponse(200, jResp:toJson())
+    endif
+
+    jResp["success"] := .F.
+    jResp["message"] := "Falha ao gerar a documentação OpenAPI."
+
+return oRest:setStatusResponse(500, jResp:toJson())
