@@ -1,0 +1,123 @@
+{
+  "_comentario": "Exemplo completo de conteudo para o gerador de MIT044. Cada lista aceita string (paragrafo comum) ou objeto {tipo, texto} com tipo = p | bullet | num | label. Cliente, projeto, pessoas e a customizacao descrita sao FICTICIOS - servem para validar o layout e como modelo de redacao.",
+
+  "arquivo": {
+    "tag_cliente": "Cliente",
+    "titulo": "Romaneio de carga e conferência de expedição"
+  },
+
+  "capa": {
+    "nome_cliente": "Indústria Modelo Ltda",
+    "codigo_cliente": "TFEX0001",
+    "nome_projeto": "Implantação ERP Protheus",
+    "codigo_projeto": "TFEX000101",
+    "segmento_cliente": "Manufatura",
+    "unidade_totvs": "Unidade de exemplo",
+    "data": "01/01/2026",
+    "proposta_comercial": "XXXX00/ XXXX01",
+    "gerente_totvs": "Gerente TOTVS (exemplo)",
+    "gerente_cliente": "Gerente do cliente (exemplo)",
+    "responsavel_totvs": "Consultor responsável (exemplo)",
+    "responsavel_cliente": "",
+    "qtd_horas": "",
+    "extra_projeto": "",
+    "criticidade": ""
+  },
+
+  "processo_atual": [
+    "A expedição trabalha hoje com um controle paralelo ao sistema: após a emissão das notas fiscais de saída, o conferente monta manualmente uma planilha com as notas que irão compor cada carga, informando transportadora, placa do veículo, motorista e a sequência de entrega. Essa planilha é impressa e acompanha o veículo como romaneio.",
+    "A conferência física dos volumes é feita sobre essa mesma impressão, com marcação a caneta. Divergências entre o que foi faturado e o que foi efetivamente carregado — falta de volume, troca de item entre cargas ou nota carregada em veículo errado — só são percebidas depois, na conferência do cliente ou no retorno da mercadoria.",
+    "Como o romaneio não existe dentro do sistema, não há rastreabilidade da carga: não é possível consultar em qual veículo uma nota saiu, qual o peso total embarcado por veículo, nem comparar o programado com o efetivamente expedido. O acompanhamento de entregas depende de contato direto com a transportadora."
+  ],
+
+  "processo_proposto": [
+    "Com a entrada em operação do Protheus, a expedição passa a contar com uma rotina customizada de romaneio de carga, na qual as notas fiscais de saída já emitidas são agrupadas em uma carga identificada por transportadora, veículo e motorista, com sequência de entrega definida pelo usuário.",
+    "A montagem da carga é feita em tela única: o usuário filtra as notas pendentes de expedição por período, cliente, transportadora ou região e marca, em uma grade, quais notas compõem a carga. O sistema totaliza peso bruto, peso líquido, volumes e valor da carga a cada marcação, sinalizando quando a capacidade cadastrada do veículo é ultrapassada.",
+    "Confirmada a montagem, o sistema grava a carga, vincula as notas selecionadas e disponibiliza a impressão do romaneio no layout definido pelo cliente. A conferência de carregamento é registrada na própria rotina: cada nota é apontada como conferida, e a carga só é liberada para saída quando todas as notas vinculadas estiverem conferidas.",
+    "As cargas ficam disponíveis para consulta e reimpressão, permitindo responder com precisão em qual veículo e em qual data cada nota fiscal foi expedida."
+  ],
+
+  "parametrizacoes": [
+    "O correto funcionamento da rotina depende das seguintes configurações e premissas sistêmicas:",
+    { "tipo": "bullet", "texto": "Transportadoras cadastradas, com os dados fiscais e de contato utilizados na impressão do romaneio;" },
+    { "tipo": "bullet", "texto": "Veículos cadastrados com placa e capacidade de carga (peso e volume), base da validação de capacidade na montagem;" },
+    { "tipo": "bullet", "texto": "Produtos com peso bruto e peso líquido preenchidos no cadastro, pois deles derivam os totalizadores da carga;" },
+    { "tipo": "bullet", "texto": "Notas fiscais de saída já emitidas e não canceladas — o romaneio opera sobre o documento fiscal, não sobre o pedido;" },
+    { "tipo": "bullet", "texto": "Definição da numeração da carga (sequencial próprio da rotina), criada via Configurador — detalhamento na especificação técnica;" },
+    { "tipo": "bullet", "texto": "Layout do romaneio validado com a expedição do cliente antes do desenvolvimento da impressão." },
+    "Serão avaliados, na especificação técnica, eventuais parâmetros próprios da rotina (SX6) para valores padrão de série, filial e tolerância de capacidade."
+  ],
+
+  "execucao": {
+    "objetivos": [
+      "Eliminar o controle paralelo em planilha, passando a montar e registrar a carga dentro do sistema;",
+      "Garantir a rastreabilidade da expedição, permitindo consultar em qual veículo e data cada nota fiscal saiu;",
+      "Reduzir divergências de carregamento por meio da conferência obrigatória das notas vinculadas à carga;",
+      "Fornecer à expedição os totalizadores de peso, volume e valor por carga no momento da montagem."
+    ],
+    "fluxo": [
+      "O usuário acessa a rotina de romaneio de carga e informa os filtros de seleção (período de emissão, cliente, transportadora e região);",
+      "O sistema apresenta na grade as notas fiscais de saída ainda não vinculadas a nenhuma carga;",
+      "O usuário informa transportadora, veículo e motorista e marca as notas que comporão a carga, acompanhando os totalizadores de peso, volume e valor;",
+      "Ao ultrapassar a capacidade cadastrada do veículo, o sistema sinaliza o excesso e solicita confirmação do usuário;",
+      "Confirmada a montagem, o sistema grava a carga com numeração própria, vincula as notas selecionadas e disponibiliza a impressão do romaneio;",
+      "Durante o carregamento, o conferente aponta na rotina cada nota conferida; a carga permanece em conferência enquanto houver nota pendente;",
+      "Conferidas todas as notas, o usuário libera a carga para saída e o sistema registra a data e a hora da expedição."
+    ],
+    "premissas": [
+      "O romaneio opera sobre notas fiscais já emitidas — não substitui nem antecipa o faturamento;",
+      "Uma nota fiscal pertence a uma única carga; para trocar de carga é necessário desvincular a nota da carga anterior, o que só é permitido enquanto a carga não estiver liberada;",
+      "A liberação da carga exige que todas as notas vinculadas estejam conferidas;",
+      "Cargas liberadas ficam bloqueadas para alteração, permitindo apenas consulta e reimpressão;",
+      "O cancelamento de uma nota fiscal já vinculada exige o desvínculo prévio da carga."
+    ],
+    "plano_teste": [
+      "Montagem de carga com notas de um único cliente → romaneio impresso com totalizadores corretos;",
+      "Montagem de carga com notas de clientes distintos e sequência de entrega definida pelo usuário → ordem respeitada na impressão;",
+      "Marcação de notas que excedem a capacidade do veículo → sinalização de excesso e confirmação do usuário;",
+      "Tentativa de vincular a mesma nota a duas cargas → operação recusada com aviso;",
+      "Liberação de carga com nota pendente de conferência → operação recusada com aviso;",
+      "Desvínculo de nota em carga ainda não liberada → nota volta a ficar disponível para seleção;",
+      "Consulta e reimpressão de carga já liberada → documento idêntico ao emitido originalmente."
+    ],
+    "rastreabilidade": "Esta customização consome as notas fiscais geradas pela rotina de faturamento e depende da classificação dos pedidos descrita na MIT044 de entrada de pedidos. Relaciona-se ainda com a MIT041 – Faturamento (emissão dos documentos de saída) e com o cadastro de transportadoras e veículos descrito na MIT041 – Estoque/Custos."
+  },
+
+  "customizacoes": {
+    "periodicidade": {
+      "sob_demanda": "Execução sob demanda (o usuário monta, confere e libera a carga pela tela de romaneio)",
+      "marcada": "sob_demanda"
+    },
+    "onde_executada": {
+      "texto": "Rotina customizada incluída no menu do módulo Faturamento (SIGAFAT), com acesso também pelo módulo Estoque/Custos (SIGAEST) para a conferência de carregamento. O código-fonte seguirá o padrão de nomenclatura do projeto e será definido na especificação técnica.",
+      "rotina": "A definir (padrão do projeto – SIGAFAT)",
+      "menu": "Romaneio de Carga e Conferência de Expedição"
+    },
+    "funcionalidades": [
+      "RF01 — Tela de montagem de carga com filtros de período, cliente, transportadora e região;",
+      "RF02 — Grade de seleção das notas fiscais de saída ainda não vinculadas a carga, com marcação múltipla;",
+      "RF03 — Totalizadores de peso bruto, peso líquido, volumes e valor, atualizados a cada marcação;",
+      "RF04 — Validação da capacidade do veículo, com sinalização de excesso e confirmação do usuário;",
+      "RF05 — Gravação da carga com numeração própria, transportadora, veículo, motorista e sequência de entrega;",
+      "RF06 — Impressão do romaneio no layout definido pelo cliente, com reimpressão de cargas já liberadas;",
+      "RF07 — Apontamento de conferência por nota fiscal, com bloqueio da liberação enquanto houver pendência;",
+      "RF08 — Liberação da carga para saída, com registro de data e hora da expedição;",
+      "RF09 — Consulta de cargas com filtro por período, transportadora, veículo e nota fiscal."
+    ],
+    "premissas_tecnicas": [
+      "Tabelas customizadas para a carga (capa) e para as notas vinculadas (itens), criadas via Configurador — estrutura detalhada na especificação técnica;",
+      "Numeração da carga controlada por sequencial próprio, com tratamento de concorrência entre usuários;",
+      "Vínculo da nota fiscal à carga gravado no documento de saída, permitindo consulta a partir da nota;",
+      "Impressão do romaneio construída sobre o mecanismo padrão de relatórios do Protheus, com layout parametrizável;",
+      "Processamento da gravação da carga em transação única, sem interação de tela durante a gravação;",
+      "Bloqueio de alteração para cargas liberadas, com trilha de data, hora e usuário nas operações de liberação e desvínculo."
+    ],
+    "prototipo_tela": "A tela será composta por um painel superior de identificação da carga (transportadora, veículo, motorista e data prevista de saída), um painel de filtros (período de emissão, cliente e região) e uma grade inferior de seleção das notas fiscais, com colunas de nota, série, cliente, município, peso bruto, volumes, valor e sequência de entrega. O rodapé exibirá os totalizadores da carga e a ocupação percentual do veículo, além das ações Montar Carga, Conferir, Liberar e Imprimir Romaneio. O protótipo definitivo (layout e colunas) será detalhado na especificação técnica.",
+    "anexos": [
+      ["MIT041 – Faturamento – Diagrama dos processos", "Processo de origem (emissão dos documentos de saída)"],
+      ["MIT044 – Tela de liberação de estoque", "Customização que gera as notas consumidas pelo romaneio"],
+      ["Modelo de romaneio utilizado hoje pela expedição", "Pendente de envio pelo cliente"],
+      ["Cadastro de veículos e capacidades", "Pendente de definição com a logística do cliente"]
+    ]
+  }
+}

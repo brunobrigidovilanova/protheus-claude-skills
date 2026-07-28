@@ -1,0 +1,19 @@
+# Saidas de build / lixo de ferramentas
+appmon/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Saidas de teste dos geradores
+saida-teste/
+*.bak
+~$*.docx
+
+# Editores / SO
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
