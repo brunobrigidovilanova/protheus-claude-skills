@@ -12,7 +12,8 @@ Regras extraídas de MIT044 já aprovadas em projetos de implantação Protheus.
   parâmetros (`MV_CONTERC`), CFOP (5.124/6.124), módulos (SIGAFAT), nomes de rotina padrão
   quando são o caminho de tela (Configurador, cadastro de clientes).
 - **Acentuação correta** — o documento é lido por gente, não pelo AppServer.
-- Bullets terminam em `;` e o último da lista em `.`.
+- Bullets terminam em `;` e o último da lista em `.`. O gerador os recua 1 cm à esquerda, então
+  bullets longos (mais de uma linha) ficam alinhados — escreva sem medo de estourar a linha.
 - Quando algo ainda não está decidido, escreva-o explicitamente ("Pendente de definição com o
   fiscal do cliente", "será detalhado na especificação técnica") em vez de omitir.
 
@@ -63,13 +64,22 @@ Depois, bullets de **pré-requisito** (cadastros, TES, parâmetros, séries, est
   envio pelo cliente.
 
 ## Tamanho de referência
-As MIT044 aprovadas têm ~90 parágrafos de conteúdo e 6 tabelas. Documento muito mais curto
-costuma indicar seção vazia; muito mais longo costuma indicar que entrou detalhe técnico.
+As MIT044 aprovadas têm ~90 parágrafos de conteúdo e 7 tabelas (capa, histórico de versões, dados
+da customização, periodicidade, rotina, anexos e aceite). Documento muito mais curto costuma
+indicar seção vazia; muito mais longo costuma indicar que entrou detalhe técnico.
+
+## Histórico de versões
+
+A tabela da primeira página registra a vida do documento, não do desenvolvimento: emissão inicial,
+revisões após reunião de validação, ajustes pedidos pelo cliente. Uma linha por versão, com data,
+número (`1.00`, `1.01`, `2.00`), quem alterou e o que mudou — em uma frase. Ao atualizar uma
+MIT044 já enviada ao cliente, **acrescente** a linha nova no JSON em vez de reescrever a anterior.
 
 ## Regerar os assets para outro cliente
 
-O template e os protótipos vêm de uma MIT044 real. Para adotar a identidade visual de outro
-cliente, rode o extrator apontando para uma MIT044 aprovada daquele cliente:
+O template embutido é o modelo oficial em branco da TOTVS; os protótipos de formatação vêm de uma
+MIT044 real. Para adotar a identidade visual de outro cliente, rode o extrator apontando para uma
+MIT044 aprovada daquele cliente:
 
 ```bash
 python ~/.claude/skills/mit044-especificacao/scripts/extrai_template.py \
@@ -78,9 +88,15 @@ python ~/.claude/skills/mit044-especificacao/scripts/extrai_template.py \
 
 Ele faz, nesta ordem: extrai os protótipos (parágrafo narrativo, label em negrito, bullet e as
 três tabelas de conteúdo, localizadas pelo texto da primeira célula); remove todos os parágrafos
-**e tabelas** entre "Processo Atual" e "Aceite", preservando os cinco `Heading 2`; esvazia os
-valores da capa mantendo os rótulos (cada célula tem 2 runs: rótulo + valor); e grava
-`template-mit044.docx` + `prototipos.xml`.
+**e tabelas** entre "Processo Atual" e "Aceite", preservando os cinco `Heading 2` e tirando deles
+as quebras de linha do respiro (senão elas dobram a cada geração); esvazia os valores da capa
+mantendo os rótulos (cada célula tem 2 runs: rótulo + valor) e as linhas do histórico de versões;
+e grava `template-mit044.docx` + `prototipos.xml`.
+
+Use este mesmo caminho para **adotar ajustes de diagramação feitos à mão**: revise um documento
+gerado no Word (cabeçalho, rodapé, margens, recuos), rode o extrator apontando para ele e o
+template passa a nascer com essas configurações. Cabeçalho e rodapé vêm inteiros do template — o
+gerador não os toca.
 
 Os três parágrafos-protótipo são detectados sozinhos (o primeiro parágrafo narrativo longo, o
 primeiro rótulo em negrito terminado em `:` e o primeiro bullet). O script imprime qual escolheu;

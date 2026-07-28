@@ -24,6 +24,15 @@
     "criticidade": ""
   },
 
+  "historico": [
+    {
+      "data": "01/01/2026",
+      "versao": "1.00",
+      "autor": "Consultor responsável (exemplo)",
+      "descricao": "Emissão inicial do documento."
+    }
+  ],
+
   "processo_atual": [
     "A expedição trabalha hoje com um controle paralelo ao sistema: após a emissão das notas fiscais de saída, o conferente monta manualmente uma planilha com as notas que irão compor cada carga, informando transportadora, placa do veículo, motorista e a sequência de entrega. Essa planilha é impressa e acompanha o veículo como romaneio.",
     "A conferência física dos volumes é feita sobre essa mesma impressão, com marcação a caneta. Divergências entre o que foi faturado e o que foi efetivamente carregado — falta de volume, troca de item entre cargas ou nota carregada em veículo errado — só são percebidas depois, na conferência do cliente ou no retorno da mercadoria.",

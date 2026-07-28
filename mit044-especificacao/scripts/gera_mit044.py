@@ -9,7 +9,7 @@ Uso:
 O nome do arquivo de saida e montado como:
     [<tag_cliente>] - Especificacao da Customizacao - MIT044 - <titulo>.docx
 """
-import sys, os, json, copy, shutil, argparse
+import sys, os, re, json, copy, shutil, argparse
 sys.stdout.reconfigure(encoding='utf-8')
 import docx
 from docx.oxml.ns import qn
@@ -25,6 +25,11 @@ PROTOTIPOS = os.path.join(ASSETS, 'prototipos.xml')
 W_P, W_TBL, W_R, W_T = qn('w:p'), qn('w:tbl'), qn('w:r'), qn('w:t')
 BULLET = '•  '          # bullet literal + 2 espacos (padrao dos documentos)
 VAZIO, MARCADO = '☐', '☒'
+
+# o template oficial traz placeholders {{campo}} na capa e paragrafos de orientacao
+# entre <>; os dois somem do documento gerado
+PLACEHOLDER = re.compile(r'\{\{[^{}]*\}\}')
+INSTRUCAO = re.compile(r'^<.*>\.?$', re.S)
 
 SECOES = ['Processo Atual', 'Processo Proposto', 'Parametrizações', 'Execução', 'Customizações']
 
@@ -47,6 +52,10 @@ DADOS_CUST = [
     ('Responsável na TOTVS',  'responsavel_totvs'),
 ]
 CRITICIDADE = {'alto': 'Alto Impacto', 'medio': 'Médio Impacto', 'baixo': 'Baixo Impacto'}
+
+# colunas da tabela "Historico de Versoes" (secao inicial do template oficial)
+HISTORICO = [('data', 'data'), ('versao', 'versão'), ('autor', 'autor'),
+             ('descricao', 'descrição')]
 
 # labels fixos dos blocos, na ordem em que aparecem no documento
 BLOCOS_EXECUCAO = [
@@ -156,6 +165,28 @@ def acha_headings(doc):
     return heads
 
 
+def limpa_quebras(heads):
+    """Tira dos títulos as quebras de linha de uma geração anterior.
+
+    Quando o template é extraído de uma MIT044 já gerada, os `<w:br>` do respiro vêm
+    junto nos títulos preservados — sem esta limpeza cada nova geração acrescentaria
+    mais uma quebra.
+    """
+    n = 0
+    for el in heads.values():
+        for r in list(el.findall(W_R)):
+            brs = r.findall(qn('w:br'))
+            if not brs:
+                continue
+            if ''.join(t.text or '' for t in r.findall(W_T)).strip():
+                for br in brs:          # run com texto: sai só a quebra
+                    r.remove(br)
+            else:
+                el.remove(r)            # run que só existia para a quebra
+            n += len(brs)
+    return n
+
+
 def limpa_miolo(doc, heads):
     """Remove parágrafos E tabelas entre 'Processo Atual' e 'Aceite' (idempotência)."""
     body = doc.element.body
@@ -171,6 +202,36 @@ def limpa_miolo(doc, heads):
             body.remove(el)
             removidos += 1
     return removidos
+
+
+def corrige_sumario(doc):
+    """Faz o campo TOC do template montar o sumário em qualquer idioma do Word.
+
+    O template traz `TOC \\t "Heading 1,1,Heading 2,2,..."` — seleção por NOME de
+    estilo em inglês. No Word em português os estilos se chamam "Título 1"/"Título 2",
+    nada casa e o F9 devolve "Nenhuma entrada de sumário foi encontrada". Trocando
+    para `\\o "1-2"` a seleção passa a ser pelo nível de estrutura de tópicos; nos
+    templates exportados do Google Docs esse nível ainda precisa ser declarado nos
+    estilos de título, que vêm sem ele.
+    """
+    ajustes = 0
+    for style in doc.styles.element.findall(qn('w:style')):
+        nome = style.find(qn('w:name'))
+        if nome is None:
+            continue
+        m = re.match(r'heading ([1-9])$', (nome.get(qn('w:val')) or '').lower())
+        if not m:
+            continue
+        pPr = style.get_or_add_pPr()
+        if pPr.find(qn('w:outlineLvl')) is None:
+            lvl = etree.SubElement(pPr, qn('w:outlineLvl'))
+            lvl.set(qn('w:val'), str(int(m.group(1)) - 1))
+            ajustes += 1
+    for instr in doc.element.body.iter(qn('w:instrText')):
+        if instr.text and 'TOC' in instr.text and '\\t' in instr.text:
+            instr.text = ' TOC \\o "1-2" \\h \\u \\z '
+            ajustes += 1
+    return ajustes
 
 
 def uniformiza_numeracao(doc, heads):
@@ -200,8 +261,31 @@ def uniformiza_numeracao(doc, heads):
     return trocados
 
 
+def acha_tabela(doc, texto, indice_padrao=None):
+    """Localiza uma tabela pelo texto de qualquer célula da 1a linha.
+
+    Localizar por conteúdo (e não por índice) mantém o gerador funcionando quando
+    o template ganha ou perde tabelas — foi o que aconteceu quando o "Histórico de
+    Versões" entrou entre a capa e os "Dados da Customização".
+    """
+    for t in doc.tables:
+        if not t.rows:
+            continue
+        for cell in t.rows[0].cells:
+            if cell.text.strip().startswith(texto):
+                return t
+        # a capa tem a 1a linha mesclada e vazia: olha também a linha seguinte
+        if len(t.rows) > 1 and t.rows[1].cells[0].text.strip().startswith(texto):
+            return t
+    if indice_padrao is not None and len(doc.tables) > indice_padrao:
+        return doc.tables[indice_padrao]
+    return None
+
+
 def preenche_capa(doc, capa):
-    tab = doc.tables[0]
+    tab = acha_tabela(doc, 'Nome do cliente', 0)
+    if tab is None:
+        raise ErroConteudo('tabela de capa não encontrada no template')
     achados = set()
     for row in tab.rows:
         for tc in row._tr.tc_lst:
@@ -217,7 +301,9 @@ def preenche_capa(doc, capa):
         print('  aviso: rótulos não localizados na capa: ' + ', '.join(faltou))
 
     # tabela "Dados da Customizacao"
-    dados = doc.tables[1]
+    dados = acha_tabela(doc, 'Dados da Customização', 1)
+    if dados is None:
+        raise ErroConteudo('tabela "Dados da Customização" não encontrada no template')
     for row in dados.rows:
         cell = row.cells[0]
         txt = cell.text.strip()
@@ -234,21 +320,102 @@ def preenche_capa(doc, capa):
 
 
 def escreve_valor(cell, rotulo, valor):
-    """Troca só o valor, preservando o run do rótulo (que costuma estar em negrito)."""
-    valor = '' if valor is None else str(valor)
+    """Reescreve a célula como "rótulo: valor", preservando o run do rótulo (negrito).
+
+    No template oficial o rótulo às vezes vem grudado ao placeholder ({{cliente}}) no
+    mesmo run — por isso o rótulo é reescrito por inteiro em vez de ter só o valor
+    trocado. O valor vai num run próprio, sem negrito.
+    """
+    valor = '' if valor is None else str(valor).strip()
     for p in cell.paragraphs:
         runs = p.runs
         if not runs:
             continue
-        if len(runs) >= 2:
-            # o run do rótulo às vezes já termina com espaço — não duplicar
-            separador = '' if runs[0].text.endswith((' ', '\t')) else ' '
-            runs[1].text = (separador + valor) if valor else ''
-            for r in runs[2:]:
-                r.text = ''
-        else:
-            runs[0].text = rotulo + ': ' + valor
+        runs[0].text = rotulo + ': '
+        for r in runs[1:]:
+            r.text = ''
+        if valor:
+            alvo = runs[1] if len(runs) >= 2 else clona_run(p, runs[0])
+            alvo.text = valor
+            alvo.bold = False
         return
+
+
+def clona_run(p, modelo):
+    """Acrescenta ao parágrafo um run com a mesma formatação do modelo."""
+    novo = copy.deepcopy(modelo._r)
+    for t in novo.findall(W_T):
+        novo.remove(t)
+    modelo._r.addnext(novo)
+    from docx.text.run import Run
+    return Run(novo, p)
+
+
+def limpa_placeholders(doc):
+    """Apaga os {{campo}} do template que nenhum valor do JSON sobrescreveu."""
+    n = 0
+    for t in doc.element.body.iter(W_T):
+        if t.text and PLACEHOLDER.search(t.text):
+            t.text = PLACEHOLDER.sub('', t.text).strip()
+            n += 1
+    return n
+
+
+def remove_instrucoes(doc):
+    """Remove os parágrafos de orientação do template (texto entre < e >).
+
+    São as instruções do documento oficial ("<Neste local deve ser descrito...>").
+    As que ficam entre "Processo Atual" e "Aceite" já saem em limpa_miolo; esta
+    varredura pega as de fora, como a do Histórico de Versões.
+    """
+    body = doc.element.body
+    n = 0
+    for el in list(body.iterchildren()):
+        if el.tag != W_P:
+            continue
+        txt = ''.join(el.itertext()).strip()
+        if txt and INSTRUCAO.match(txt):
+            body.remove(el)
+            n += 1
+    return n
+
+
+def acha_historico(doc):
+    """Tabela do "Histórico de Versões", pelo cabeçalho completo.
+
+    Exige as duas primeiras colunas ("Data" e "Versão") porque a tabela do Aceite
+    também tem uma coluna "Data" — casar só por ela sobrescreve o quadro de assinatura.
+    """
+    for t in doc.tables:
+        if not t.rows or len(t.rows[0].cells) < len(HISTORICO):
+            continue
+        cabecalho = [c.text.strip() for c in t.rows[0].cells]
+        if cabecalho[0].startswith('Data') and cabecalho[1].startswith('Versão'):
+            return t
+    return None
+
+
+def preenche_historico(doc, historico):
+    """Preenche a tabela "Histórico de Versões" (cabeçalho + uma linha por versão).
+
+    As linhas em branco que sobram são mantidas — é onde as revisões seguintes do
+    documento vão ser anotadas à mão.
+    """
+    tab = acha_historico(doc)
+    if tab is None:
+        return 0
+    livres = tab.rows[1:]
+    if len(historico) > len(livres):
+        modelo = copy.deepcopy(livres[-1]._tr)
+        for _ in range(len(historico) - len(livres)):
+            tab._tbl.append(copy.deepcopy(modelo))
+        livres = tab.rows[1:]
+    for row, versao in zip(livres, historico):
+        for tc, (chave, rotulo) in zip(row._tr.tc_lst, HISTORICO):
+            if chave not in versao:
+                raise ErroConteudo('historico: falta a %s de uma das versões' % rotulo)
+            texto_celula(tc, str(versao[chave]), doc)
+    return len(historico)
 
 
 def marca_checkbox(cell, alvo):
@@ -288,6 +455,52 @@ def respiro(p_el, onde='fim'):
     else:
         runs[0].addprevious(novo)
     return p_el
+
+
+def quebra_pagina_antes(tabela):
+    """Faz a tabela começar em página nova (o "Quebrar página antes" do Word).
+
+    Vai no primeiro parágrafo da primeira célula: é assim que o Word marca a quebra
+    para uma tabela. O template traz `pageBreakBefore w:val="0"` em vários parágrafos,
+    então o valor existente é sobrescrito em vez de duplicado.
+    """
+    if tabela is None or not tabela.rows:
+        return False
+    p = tabela.rows[0].cells[0].paragraphs[0]._p
+    pPr = p.find(qn('w:pPr'))
+    if pPr is None:
+        pPr = etree.SubElement(p, qn('w:pPr'))
+        p.insert(0, pPr)
+    quebra = pPr.find(qn('w:pageBreakBefore'))
+    if quebra is None:
+        quebra = etree.Element(qn('w:pageBreakBefore'))
+        # no OOXML pageBreakBefore vem logo depois de pStyle/keepNext/keepLines
+        anterior = None
+        for tag in ('w:pStyle', 'w:keepNext', 'w:keepLines'):
+            achado = pPr.find(qn(tag))
+            if achado is not None:
+                anterior = achado
+        if anterior is not None:
+            anterior.addnext(quebra)
+        else:
+            pPr.insert(0, quebra)
+    quebra.set(qn('w:val'), '1')
+    return True
+
+
+def respiro_entre_secoes(blocos):
+    """Uma linha de respiro antes de cada título de seção.
+
+    A quebra vai no fim do último elemento da seção anterior — o mesmo lugar em que
+    ela é feita à mão no Word. Quando a seção termina em tabela não há onde inserir
+    o <w:br>, e o bloco é pulado.
+    """
+    n = 0
+    for els in blocos:
+        if els and els[-1].tag == W_P:
+            respiro(els[-1], 'fim')
+            n += 1
+    return n
 
 
 def aplica_respiro(elementos):
@@ -421,6 +634,19 @@ def valida(conteudo):
     for chave in ('nome_cliente', 'data'):
         if not conteudo['capa'].get(chave):
             raise ErroConteudo('capa."%s" é obrigatório' % chave)
+    hist = conteudo.get('historico')
+    if hist is not None and not isinstance(hist, list):
+        raise ErroConteudo('"historico" deve ser uma lista de versões')
+
+
+def historico_padrao(capa):
+    """Primeira linha do histórico quando o JSON não traz "historico"."""
+    return [{
+        'data': capa.get('data', ''),
+        'versao': '1.00',
+        'autor': capa.get('responsavel_totvs') or capa.get('gerente_totvs', ''),
+        'descricao': 'Emissão inicial do documento.',
+    }]
 
 
 def nome_saida(arq):
@@ -463,19 +689,31 @@ def main():
     removidos = limpa_miolo(doc, heads)
     if removidos:
         print('miolo do template limpo: %d elementos' % removidos)
+    quebras = limpa_quebras(heads)
+    if quebras:
+        print('quebras de linha herdadas nos títulos removidas: %d' % quebras)
 
     if args.numeracao_uniforme:
         print('numeração dos títulos uniformizada: %d seções'
               % uniformiza_numeracao(doc, heads))
 
-    preenche_capa(doc, conteudo['capa'])
+    if corrige_sumario(doc):
+        print('campo do sumário ajustado para seleção por nível de título')
 
-    insere_apos(heads['Processo Atual'],
-                itens_para_elementos(conteudo['processo_atual'], protos, 'processo_atual'))
-    insere_apos(heads['Processo Proposto'],
-                itens_para_elementos(conteudo['processo_proposto'], protos, 'processo_proposto'))
-    insere_apos(heads['Parametrizações'],
-                itens_para_elementos(conteudo['parametrizacoes'], protos, 'parametrizacoes'))
+    preenche_capa(doc, conteudo['capa'])
+    versoes = conteudo.get('historico') or historico_padrao(conteudo['capa'])
+    if preenche_historico(doc, versoes):
+        print('histórico de versões: %d linha(s)' % len(versoes))
+    instrucoes = remove_instrucoes(doc)
+    if instrucoes:
+        print('textos de orientação do template removidos: %d' % instrucoes)
+
+    if quebra_pagina_antes(acha_tabela(doc, 'Dados da Customização', 1)):
+        print('quadro "Dados da Customização" começa em página nova')
+
+    els_atu = itens_para_elementos(conteudo['processo_atual'], protos, 'processo_atual')
+    els_pro = itens_para_elementos(conteudo['processo_proposto'], protos, 'processo_proposto')
+    els_par = itens_para_elementos(conteudo['parametrizacoes'], protos, 'parametrizacoes')
     els_exe = monta_execucao(doc, protos, conteudo['execucao'])
     els_cus = monta_customizacoes(doc, protos, conteudo['customizacoes'])
     if not args.sem_respiro:
@@ -485,8 +723,17 @@ def main():
         respiro(heads['Execução'], 'fim')
         respiro(heads['Customizações'], 'fim')
         respiro(heads['Aceite'], 'inicio')
+        # e antes de cada título de seção, no fim da seção anterior
+        respiro_entre_secoes([els_atu, els_pro, els_par, els_exe])
+    insere_apos(heads['Processo Atual'], els_atu)
+    insere_apos(heads['Processo Proposto'], els_pro)
+    insere_apos(heads['Parametrizações'], els_par)
     insere_apos(heads['Execução'], els_exe)
     insere_apos(heads['Customizações'], els_cus)
+
+    sobras = limpa_placeholders(doc)
+    if sobras:
+        print('placeholders {{...}} do template limpos: %d' % sobras)
 
     os.makedirs(os.path.dirname(destino), exist_ok=True)
     doc.save(destino)

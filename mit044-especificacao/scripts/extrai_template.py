@@ -84,6 +84,21 @@ def acha_tabela(doc, cabecalho):
     raise SystemExit('tabela protótipo não encontrada: ' + cabecalho)
 
 
+def tabela_por_prefixo(doc, prefixo):
+    """Localiza uma tabela pelo texto inicial da 1a celula preenchida (a capa tem a
+    1a linha mesclada e vazia). Por conteudo, e nao por indice: os templates mais
+    novos trazem o "Historico de Versoes" entre a capa e os "Dados da Customizacao"."""
+    for t in doc.tables:
+        for row in t.rows[:2]:
+            for cell in row.cells:
+                txt = cell.text.strip()
+                if txt:
+                    if txt.startswith(prefixo):
+                        return t
+                    break
+    return None
+
+
 def limpa_valor_celula(cell):
     """Esvazia o VALOR da celula da capa, preservando o rotulo (1o run) e a formatacao."""
     for p in cell.paragraphs:
@@ -151,6 +166,23 @@ def main():
     if faltando:
         raise SystemExit('headings não encontrados no documento de origem: ' + ', '.join(faltando))
 
+    # os titulos preservados podem trazer <w:br> de uma geracao anterior (o respiro);
+    # sem limpar, cada nova geracao acrescentaria mais uma quebra
+    quebras = 0
+    for el in heads.values():
+        for r in list(el.findall(W_R)):
+            brs = r.findall(qn('w:br'))
+            if not brs:
+                continue
+            if ''.join(t.text or '' for t in r.findall(W_T)).strip():
+                for br in brs:
+                    r.remove(br)
+            else:
+                el.remove(r)
+            quebras += len(brs)
+    if quebras:
+        print('quebras de linha removidas dos títulos: %d' % quebras)
+
     manter = {id(heads[s]) for s in SECOES}
     dentro, rem_p, rem_t = False, 0, 0
     for el in list(body.iterchildren()):
@@ -168,14 +200,14 @@ def main():
     print('miolo removido: %d parágrafos, %d tabelas' % (rem_p, rem_t))
 
     # ---------- 3. esvaziar os valores da capa ----------
-    capa = doc.tables[0]
+    capa = tabela_por_prefixo(doc, 'Nome do cliente') or doc.tables[0]
     for row in capa.rows:
         for tc in row._tr.tc_lst:
             from docx.table import _Cell
             limpa_valor_celula(_Cell(tc, capa))
-    # "Responsavel na TOTVS" da tabela 2 tambem e' dado de pessoa
-    dados = doc.tables[1]
-    for row in dados.rows:
+    # "Responsavel na TOTVS" da tabela de dados tambem e' dado de pessoa
+    dados = tabela_por_prefixo(doc, 'Dados da Customização')
+    for row in (dados.rows if dados is not None else []):
         txt = row.cells[0].text
         if txt.startswith('Responsável na TOTVS'):
             for p in row.cells[0].paragraphs:
@@ -185,6 +217,13 @@ def main():
                         r.text = ''
                 elif len(runs) == 1:
                     runs[0].text = 'Responsável na TOTVS: '
+    # historico de versoes: o template sai em branco, para o proximo documento
+    historico = tabela_por_prefixo(doc, 'Data')
+    for row in (historico.rows[1:] if historico is not None else []):
+        for cell in row.cells:
+            for p in cell.paragraphs:
+                for r in p.runs:
+                    r.text = ''
 
     caminho_tpl = os.path.join(destino, 'template-mit044.docx')
     doc.save(caminho_tpl)

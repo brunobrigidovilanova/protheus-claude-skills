@@ -25,7 +25,7 @@ Na próxima sessão (ou na atual, em alguns clientes), a skill aparece automatic
 | Skill | Categoria | Descrição | Guia |
 |-------|-----------|-----------|------|
 | [tlpp-doc-generate](tlpp-doc-generate/) | Documentação | Gera documentação **OpenAPI 3.x (YAML)** de APIs REST TLPP com `tlpp.doc.generate()` (motor REST-DOC do tlppCore) e prepara o resultado para o [Explorador OpenAPI da TOTVS](https://totvs.github.io/totvstec-doc/tools/explorador-openapi). Inclui script de correção do YAML (encoding + chaves duplicadas). | 📖 [Guia completo](tlpp-doc-generate/) |
-| [mit044-especificacao](mit044-especificacao/) | Documentação | Gera o documento **MIT044 — Especificação da Customização** em `.docx` a partir de um JSON de conteúdo, no layout dos projetos de implantação (capa, sumário, cinco seções e aceite). Inclui guia de redação seção a seção, validador estrutural e extrator para adotar outro template. | 📖 [Guia completo](mit044-especificacao/) |
+| [mit044-especificacao](mit044-especificacao/) | Documentação | Gera o documento **MIT044 — Especificação da Customização** em `.docx` a partir de um JSON de conteúdo, no layout oficial dos projetos de implantação (capa, histórico de versões, sumário, cinco seções e aceite). Inclui guia de redação seção a seção, validador estrutural e extrator para adotar outro template. | 📖 [Guia completo](mit044-especificacao/) |
 
 > Mais skills serão adicionadas aqui. Sugestões e contribuições são bem-vindas via issue ou PR —
 > cada skill traz uma seção "Como contribuir" no seu próprio guia.
