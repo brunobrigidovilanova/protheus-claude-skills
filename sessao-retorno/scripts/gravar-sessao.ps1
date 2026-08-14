@@ -3,7 +3,7 @@
     Gera um atalho .bat que reabre uma sessao do Claude Code (claude --resume).
 
 .DESCRIPTION
-    Chamado pela skill /sessao. Valida que o transcript da sessao existe,
+    Chamado pela skill /sessao-retorno. Valida que o transcript da sessao existe,
     monta um nome de arquivo a partir da data + assunto, e grava um .bat que
     abre o Windows Terminal (com fallback para powershell.exe) no diretorio
     do projeto ja retomando aquela sessao.
@@ -170,7 +170,7 @@ $assuntoBat = ($assuntoBat -replace '[<>|&^%]', ' ').Trim()
 $conteudo = @"
 @echo off
 REM ============================================================
-REM  Sessao Claude Code - gravada por /sessao
+REM  Sessao Claude Code - gravada por /sessao-retorno
 REM  Data....: $agora
 REM  Projeto.: $ProjectDir
 REM  Assunto.: $assuntoBat

@@ -1,10 +1,10 @@
-# sessao — atalho `.bat` para voltar à janela do Claude Code que você fechou
+# sessao-retorno — atalho `.bat` para voltar à janela do Claude Code que você fechou
 
 Grava um arquivo `.bat` no Desktop que **reabre uma sessão específica do Claude Code**, no
 diretório certo, com o histórico inteiro da conversa — restaurando também a **cor da aba** do
 Windows Terminal e o **modo de permissão** em que a sessão estava.
 
-Você digita `/sessao`, dá `exit` sem medo e volta com um duplo clique.
+Você digita `/sessao-retorno`, dá `exit` sem medo e volta com um duplo clique.
 
 > **Não confunda com `/session-summary` + `/session-resume`.** Aquelas geram um `.md` de resumo
 > para recarregar contexto depois de um `/clear`. Esta skill não resume nada: ela retoma a
@@ -27,10 +27,10 @@ você use o Claude Code.
 ## Instalação
 
 ```powershell
-Copy-Item -Recurse .\sessao "$env:USERPROFILE\.claude\skills\"
+Copy-Item -Recurse .\sessao-retorno "$env:USERPROFILE\.claude\skills\"
 ```
 
-Reinicie o Claude Code — skills são carregadas na abertura da sessão, então o comando `/sessao`
+Reinicie o Claude Code — skills são carregadas na abertura da sessão, então o comando `/sessao-retorno`
 aparece a partir da **próxima** janela.
 
 ### Recomendado: aumentar a retenção dos transcripts
@@ -53,19 +53,19 @@ sumiu — em vez de deixar o CLI falhar sem explicação.
 Na janela que você quer poder retomar depois:
 
 ```
-/sessao
+/sessao-retorno
 ```
 
 O assunto é inferido da conversa. Para nomear você mesmo:
 
 ```
-/sessao API de pedidos
+/sessao-retorno API de pedidos
 ```
 
 Para gravar com uma cor de aba:
 
 ```
-/sessao API de pedidos em azul
+/sessao-retorno API de pedidos em azul
 ```
 
 O resultado é um arquivo em `%USERPROFILE%\Desktop\Sessoes Claude`:
@@ -110,7 +110,7 @@ Os nomes usam a paleta **Campbell**, a mesma do tema padrão do Windows Terminal
 `#RRGGBB` avulso também vale. Nome desconhecido aborta e lista os válidos, sem tocar no atalho
 existente.
 
-**A cor gruda:** rodar `/sessao` de novo *sem* mencionar cor preserva a que o atalho já tinha —
+**A cor gruda:** rodar `/sessao-retorno` de novo *sem* mencionar cor preserva a que o atalho já tinha —
 o script lê o `--tabColor` do arquivo antigo antes de regravar.
 
 ## O modo de permissão
@@ -133,12 +133,12 @@ A leitura pega só os últimos 512 KB do arquivo, porque transcripts passam de 1
 > o seu `settings.json` tem `skipDangerousModePermissionPrompt`, ele nem pergunta. O cabeçalho do
 > `.bat` mostra a linha `REM  Modo....:` — vale saber o que cada arquivo da pasta carrega.
 
-É uma foto do momento da gravação: se você trocar de modo **depois** de rodar `/sessao`, rode de
+É uma foto do momento da gravação: se você trocar de modo **depois** de rodar `/sessao-retorno`, rode de
 novo antes de sair.
 
 ## Um `.bat` por sessão
 
-O script localiza o atalho pelo `SESSION_ID` gravado dentro dele. Rodar `/sessao` de novo na
+O script localiza o atalho pelo `SESSION_ID` gravado dentro dele. Rodar `/sessao-retorno` de novo na
 mesma janela **renomeia ou atualiza** o arquivo existente — nunca cria um segundo `.bat` para a
 mesma conversa. Se o assunto mudou, o arquivo é renomeado.
 
@@ -148,7 +148,7 @@ A skill é só a camada que descobre o ID da sessão e o assunto; o arquivo é e
 que roda sozinho:
 
 ```powershell
-& "$env:USERPROFILE\.claude\skills\sessao\scripts\gravar-sessao.ps1" `
+& "$env:USERPROFILE\.claude\skills\sessao-retorno\scripts\gravar-sessao.ps1" `
     -SessionId "00000000-1111-2222-3333-444444444444" `
     -ProjectDir "C:\Projetos\MinhaApp" `
     -ProjectEncoded "C--Projetos-MinhaApp" `
@@ -172,7 +172,7 @@ O `<PROJETO_ENCODADO>` é o nome da pasta que o Claude Code usa em
 | O `.bat` abre e avisa que o histórico não existe mais | passaram-se mais de 30 dias e o Claude Code apagou o transcript | não há como recuperar; o atalho pode ser apagado |
 | Acentos embaralhados dentro do `.bat` | o `cmd` usa codepage OEM | o script já remove a acentuação do **conteúdo**; o **nome do arquivo** pode ter acentos normalmente |
 | A aba não fica colorida | o Windows Terminal não está instalado (caiu no fallback) ou nenhuma cor foi gravada | instale o Windows Terminal; regrave mencionando a cor |
-| Dois `.bat` da mesma conversa | os arquivos foram renomeados na mão, quebrando a busca pelo `SESSION_ID` | apague o duplicado e rode `/sessao` de novo |
+| Dois `.bat` da mesma conversa | os arquivos foram renomeados na mão, quebrando a busca pelo `SESSION_ID` | apague o duplicado e rode `/sessao-retorno` de novo |
 | O atalho abre a conversa errada | o ID veio do `.jsonl` mais recente com várias janelas abertas no mesmo diretório | a skill deve usar o caminho do scratchpad como fonte primária |
 
 ## Estrutura
