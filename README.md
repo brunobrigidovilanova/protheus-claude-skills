@@ -1,6 +1,6 @@
 # protheus-claude-skills
 
-Skills do [Claude Code](https://claude.com/claude-code) para desenvolvimento **TOTVS Protheus (AdvPL/TLPP)**.
+Skills do [Claude Code](https://claude.com/claude-code) para desenvolvimento **TOTVS Protheus (AdvPL/TLPP)** — e utilitários de produtividade do dia a dia com o próprio Claude Code.
 
 Cada skill é uma pasta com um `SKILL.md` (instruções que o Claude carrega) e um `README.md` com o **guia completo** — clique no link da tabela abaixo para abrir a pasta da skill e ler o guia renderizado.
 
@@ -26,6 +26,7 @@ Na próxima sessão (ou na atual, em alguns clientes), a skill aparece automatic
 |-------|-----------|-----------|------|
 | [tlpp-doc-generate](tlpp-doc-generate/) | Documentação | Gera documentação **OpenAPI 3.x (YAML)** de APIs REST TLPP com `tlpp.doc.generate()` (motor REST-DOC do tlppCore) e prepara o resultado para o [Explorador OpenAPI da TOTVS](https://totvs.github.io/totvstec-doc/tools/explorador-openapi). Inclui script de correção do YAML (encoding + chaves duplicadas). | 📖 [Guia completo](tlpp-doc-generate/) |
 | [mit044-especificacao](mit044-especificacao/) | Documentação | Gera o documento **MIT044 — Especificação da Customização** em `.docx` a partir de um JSON de conteúdo, no layout oficial dos projetos de implantação (capa, histórico de versões, sumário, cinco seções e aceite). Inclui guia de redação seção a seção, validador estrutural e extrator para adotar outro template. | 📖 [Guia completo](mit044-especificacao/) |
+| [sessao](sessao/) | Produtividade | Grava um `.bat` no Desktop que **reabre a janela do Claude Code que você fechou** (`claude --resume`), no diretório certo e com o histórico inteiro — restaurando também a cor da aba do Windows Terminal e o modo de permissão em que a sessão estava. Um atalho por sessão, sem duplicar. | 📖 [Guia completo](sessao/) |
 
 > Mais skills serão adicionadas aqui. Sugestões e contribuições são bem-vindas via issue ou PR —
 > cada skill traz uma seção "Como contribuir" no seu próprio guia.
