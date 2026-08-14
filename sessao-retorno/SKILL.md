@@ -1,11 +1,11 @@
 ---
-name: sessao
-description: Grava um atalho .bat no Desktop que reabre esta janela do Claude Code exatamente onde parou (claude --resume). Use quando o usuario digitar /sessao ou pedir para salvar/gravar a sessao atual para voltar depois.
+name: sessao-retorno
+description: Grava um atalho .bat no Desktop que reabre esta janela do Claude Code exatamente onde parou (claude --resume). Use quando o usuario digitar /sessao-retorno ou pedir para salvar/gravar a sessao atual para voltar depois.
 argument-hint: [nome-do-atalho]
 disable-model-invocation: true
 ---
 
-# Sessao — atalho .bat para retomar esta janela depois
+# Sessao-retorno — atalho .bat para retomar esta janela depois
 
 ## Objetivo
 
@@ -55,7 +55,7 @@ Se `$ARGUMENTS` foi informado, use-o como assunto, sem reescrever.
 
 ### Passo 4 — Definir a cor da aba (opcional)
 
-Se o usuario mencionar uma cor (`/sessao API de pedidos em azul`, "grava com a aba vermelha"),
+Se o usuario mencionar uma cor (`/sessao-retorno API de pedidos em azul`, "grava com a aba vermelha"),
 passe-a em `-Cor`. Valores aceitos: `vermelho`, `verde`, `azul`, `ciano`, `amarelo`,
 `roxo`, `laranja`, `rosa`, `cinza` — ou um hex `#RRGGBB`.
 
@@ -75,7 +75,7 @@ atalho abrir em outro modo ("quero que volte em modo plano").
 Chame o script auxiliar (caminhos entre aspas):
 
 ```powershell
-& "$env:USERPROFILE\.claude\skills\sessao\scripts\gravar-sessao.ps1" `
+& "$env:USERPROFILE\.claude\skills\sessao-retorno\scripts\gravar-sessao.ps1" `
     -SessionId "<SESSION_ID>" `
     -ProjectDir "<CWD>" `
     -ProjectEncoded "<PROJETO_ENCODADO>" `
