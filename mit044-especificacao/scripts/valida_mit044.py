@@ -15,9 +15,11 @@ from docx.text.paragraph import Paragraph
 # titulos que precisam existir, nesta ordem. "Ambientação" e "Histórico de Versões"
 # nao entram: no template oficial o primeiro e' formatado direto (sem estilo de titulo)
 # e o segundo so' existe nas versoes mais novas do documento.
-ESQUELETO = ['Sumário', 'Especificação da Customização', 'Processo Atual',
-             'Processo Proposto', 'Parametrizações', 'Execução', 'Customizações', 'Aceite']
+ESQUELETO = ['Sumário', 'Especificação da Customização', 'Aceite']
 SECOES = ['Processo Atual', 'Processo Proposto', 'Parametrizações', 'Execução', 'Customizações']
+# os cinco titulos de secao podem ser renomeados pela chave titulos_secoes do JSON
+# (documento do que ja existe, em vez de especificacao). A conferencia e' posicional:
+# cinco Heading 2 entre "Especificacao da Customizacao" e "Aceite".
 LABELS = [
     'Objetivos do negócio:', 'Fluxo do processo:', 'Premissas e Restrições:',
     'Plano de teste e cenários esperados:', 'Rastreabilidade / dependência com outra MIT044:',
@@ -74,10 +76,20 @@ def main():
                if p.text.strip() and p.style.name in ('Title', 'Heading 1', 'Heading 2')]
     textos = [t for _, t in titulos]
     na_ordem = [t for t in textos if t in ESQUELETO]
-    ok(na_ordem == ESQUELETO, 'títulos obrigatórios na ordem canônica', repr(textos))
-    estilos_secao = {t: e for e, t in titulos}
-    erradas = [s for s in SECOES if estilos_secao.get(s) != 'Heading 2']
-    ok(not erradas, 'as cinco seções são Heading 2', 'fora do padrão: ' + repr(erradas))
+    ok(na_ordem == ESQUELETO, 'títulos de abertura e fechamento na ordem canônica',
+       repr(textos))
+
+    try:
+        ini = textos.index('Especificação da Customização')
+        fim = textos.index('Aceite')
+    except ValueError:
+        ini = fim = -1
+    secoes = [t for e, t in titulos[ini + 1:fim] if e == 'Heading 2'] if ini >= 0 else []
+    ok(len(secoes) == 5, 'cinco seções (Heading 2) entre a abertura e o Aceite',
+       'encontradas %d: %r' % (len(secoes), secoes))
+    renomeadas = [s for s in secoes if s not in SECOES]
+    if renomeadas:
+        print('  nota   seções renomeadas (titulos_secoes): %r' % renomeadas)
 
     # 2. tabelas
     rotulos = [rotulo_tabela(t) for t in doc.tables]

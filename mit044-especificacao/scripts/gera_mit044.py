@@ -12,7 +12,10 @@ O nome do arquivo de saida e montado como:
 import sys, os, re, json, copy, shutil, argparse
 sys.stdout.reconfigure(encoding='utf-8')
 import docx
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
+from docx.shared import Cm, Pt
 from docx.table import Table, _Cell
 from docx.text.paragraph import Paragraph
 from lxml import etree
@@ -25,6 +28,9 @@ PROTOTIPOS = os.path.join(ASSETS, 'prototipos.xml')
 W_P, W_TBL, W_R, W_T = qn('w:p'), qn('w:tbl'), qn('w:r'), qn('w:t')
 BULLET = '•  '          # bullet literal + 2 espacos (padrao dos documentos)
 VAZIO, MARCADO = '☐', '☒'
+LARGURA_UTIL_CM = 16.0  # mancha da pagina A4 do template - some das larguras de coluna
+FONTE_TABELA_PT = 8.5   # corpo das tabelas de conteudo (o texto normal e maior)
+BASE_FIGURAS = '.'      # pasta do JSON: os caminhos de figura sao relativos a ela
 
 # o template oficial traz placeholders {{campo}} na capa e paragrafos de orientacao
 # entre <>; os dois somem do documento gerado
@@ -150,6 +156,110 @@ def clona_tabela(proto, linhas, doc):
     return tbl
 
 
+# ------------------------------------------------ tabelas livres e figuras
+def borda_simples(tbl):
+    """Bordas simples em todas as linhas, como nas tabelas do template.
+
+    O layout vai fixo de proposito: sem isso o Word reajusta as colunas ao abrir
+    e as larguras calculadas aqui se perdem.
+    """
+    pr = tbl._tbl.tblPr
+    for tag in ('w:tblBorders', 'w:tblLayout'):
+        for el in pr.findall(qn(tag)):
+            pr.remove(el)
+    bordas = OxmlElement('w:tblBorders')
+    for lado in ('top', 'left', 'bottom', 'right', 'insideH', 'insideV'):
+        e = OxmlElement('w:' + lado)
+        e.set(qn('w:val'), 'single')
+        e.set(qn('w:sz'), '4')
+        e.set(qn('w:space'), '0')
+        e.set(qn('w:color'), 'auto')
+        bordas.append(e)
+    pr.append(bordas)
+    layout = OxmlElement('w:tblLayout')
+    layout.set(qn('w:type'), 'fixed')
+    pr.append(layout)
+
+
+def tabela_livre(doc, linhas, larguras=None, fonte=FONTE_TABELA_PT):
+    """Monta uma tabela de N colunas; a primeira linha e o cabecalho, em negrito.
+
+    `larguras` e uma lista em centimetros, uma por coluna, que deve somar a mancha
+    da pagina (LARGURA_UTIL_CM). Omitida, as colunas ficam iguais. O <w:tbl> volta
+    solto do corpo, para ser posicionado depois por insere_apos.
+    """
+    if not linhas or not linhas[0]:
+        raise ErroConteudo('tabela sem linhas ou sem colunas')
+    ncol = len(linhas[0])
+    for i, linha in enumerate(linhas):
+        if len(linha) != ncol:
+            raise ErroConteudo('linha %d da tabela tem %d colunas (o cabeçalho tem %d)'
+                               % (i + 1, len(linha), ncol))
+    if larguras:
+        if len(larguras) != ncol:
+            raise ErroConteudo('larguras: %d valores para %d colunas'
+                               % (len(larguras), ncol))
+        if abs(sum(larguras) - LARGURA_UTIL_CM) > 1.0:
+            print('AVISO: as larguras somam %.1f cm (a mancha tem %.1f cm)'
+                  % (sum(larguras), LARGURA_UTIL_CM))
+    else:
+        larguras = [LARGURA_UTIL_CM / float(ncol)] * ncol
+
+    tbl = doc.add_table(rows=len(linhas), cols=ncol)
+    if 'TableNormal' in [s.name for s in doc.styles]:
+        tbl.style = doc.styles['TableNormal']
+    tbl.autofit = False
+    borda_simples(tbl)
+    for i, linha in enumerate(linhas):
+        for j, valor in enumerate(linha):
+            cel = tbl.cell(i, j)
+            cel.width = Cm(larguras[j])
+            par = cel.paragraphs[0]
+            par.paragraph_format.space_before = Pt(1)
+            par.paragraph_format.space_after = Pt(1)
+            run = par.add_run('' if valor is None else str(valor))
+            run.font.size = Pt(fonte)
+            run.font.name = 'Arial'
+            run.bold = (i == 0)
+    el = tbl._tbl
+    el.getparent().remove(el)
+    return el
+
+
+def figura(doc, caminho, legenda=None, largura_cm=LARGURA_UTIL_CM):
+    """Imagem centralizada, com legenda em italico logo abaixo.
+
+    A largura e limitada a mancha da pagina: imagem maior que isso sairia cortada.
+    Devolve os <w:p> soltos do corpo, na ordem imagem, legenda.
+    """
+    if not os.path.isfile(caminho):
+        raise ErroConteudo('figura não encontrada: ' + caminho)
+    secao = doc.sections[0]
+    limite = secao.page_width - secao.left_margin - secao.right_margin
+    largura = min(Cm(largura_cm), limite)
+
+    corpo = doc.add_paragraph()
+    corpo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    corpo.paragraph_format.space_before = Pt(8)
+    corpo.paragraph_format.space_after = Pt(3)
+    corpo.add_run().add_picture(caminho, width=largura)
+    els = [corpo._p]
+
+    if legenda:
+        leg = doc.add_paragraph()
+        leg.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        leg.paragraph_format.space_after = Pt(10)
+        run = leg.add_run(legenda)
+        run.italic = True
+        run.font.size = Pt(8.5)
+        run.font.name = 'Arial'
+        els.append(leg._p)
+
+    for el in els:
+        el.getparent().remove(el)
+    return els
+
+
 # ------------------------------------------------------------------ documento
 def acha_headings(doc):
     heads = {}
@@ -184,6 +294,29 @@ def limpa_quebras(heads):
             else:
                 el.remove(r)            # run que só existia para a quebra
             n += len(brs)
+    return n
+
+
+def renomeia_secoes(heads, mapa):
+    """Troca o texto dos cinco Heading 2 pelos nomes informados no JSON.
+
+    Serve para documentar uma customizacao que ja existe, em que "Processo Atual"
+    e "Processo Proposto" nao descrevem mais nada: o documento vira "Visao Geral"
+    e "Como funciona hoje". O sumario continua correto porque o campo TOC do
+    template seleciona por NIVEL de titulo (\\o "1-2"), nao por nome.
+    """
+    n = 0
+    for canonico, novo in (mapa or {}).items():
+        if canonico not in heads:
+            raise ErroConteudo('titulos_secoes: "%s" nao e uma das seções' % canonico)
+        if not novo:
+            continue
+        for run in heads[canonico].findall(W_R):
+            ts = run.findall(W_T)
+            if ts and ts[0].text and ts[0].text.strip() == canonico:
+                ts[0].text = novo
+                n += 1
+                break
     return n
 
 
@@ -528,9 +661,16 @@ def insere_apos(ancora, elementos):
 
 
 # ------------------------------------------------------------------ conteudo
-def itens_para_elementos(itens, protos, contexto):
-    """Converte a lista do JSON em elementos <w:p>. Item pode ser string (parágrafo)
-    ou objeto {"tipo": "p"|"bullet"|"num"|"label", "texto": "..."}."""
+def itens_para_elementos(itens, protos, contexto, doc=None):
+    """Converte a lista do JSON em elementos do documento.
+
+    Item pode ser uma string (parágrafo) ou um objeto:
+      {"tipo": "p"|"bullet"|"num"|"label", "texto": "..."}
+      {"tipo": "tabela", "titulo": "...", "linhas": [[cab...], [...]], "larguras": [...]}
+      {"tipo": "figura", "arquivo": "...", "legenda": "...", "largura_cm": 16}
+    Tabela e figura precisam do `doc` (a imagem vira parte do .docx e a tabela nasce
+    do estilo do documento); o caminho da figura é relativo à pasta do JSON.
+    """
     out = []
     n_num = 0
     for item in itens:
@@ -540,6 +680,28 @@ def itens_para_elementos(itens, protos, contexto):
             tipo, texto = item.get('tipo', 'p'), item.get('texto', '')
         else:
             raise ErroConteudo('item inválido em %s: %r' % (contexto, item))
+
+        if tipo in ('tabela', 'figura'):
+            if doc is None:
+                raise ErroConteudo('"%s" não é aceito em %s' % (tipo, contexto))
+            if tipo == 'tabela':
+                if item.get('titulo'):
+                    out.append(clona_paragrafo(protos['label'], item['titulo']))
+                out.append(tabela_livre(doc, item.get('linhas'),
+                                        item.get('larguras'),
+                                        item.get('fonte', FONTE_TABELA_PT)))
+                # o Word funde tabelas coladas: o parágrafo vazio as mantém separadas
+                out.append(clona_paragrafo(protos['body'], ''))
+            else:
+                caminho = item.get('arquivo', '')
+                if not caminho:
+                    raise ErroConteudo('figura sem "arquivo" em ' + contexto)
+                if not os.path.isabs(caminho):
+                    caminho = os.path.join(BASE_FIGURAS, caminho)
+                out += figura(doc, caminho, item.get('legenda'),
+                              item.get('largura_cm', LARGURA_UTIL_CM))
+            continue
+
         if not texto:
             raise ErroConteudo('item sem texto em ' + contexto)
         if tipo == 'bullet':
@@ -556,14 +718,14 @@ def itens_para_elementos(itens, protos, contexto):
     return out
 
 
-def bloco(protos, label, itens, formato, contexto):
+def bloco(protos, label, itens, formato, contexto, doc=None):
     """Label em negrito + itens no formato indicado (bullet/num/p)."""
     els = [clona_paragrafo(protos['label'], label)]
     if isinstance(itens, str):
         itens = [itens]
     els += itens_para_elementos(
         [{'tipo': formato, 'texto': i} if isinstance(i, str) else i for i in itens],
-        protos, contexto)
+        protos, contexto, doc)
     return els
 
 
@@ -572,7 +734,7 @@ def monta_execucao(doc, protos, exe):
     for chave, label, formato in BLOCOS_EXECUCAO:
         if chave not in exe:
             raise ErroConteudo('execucao."%s" ausente no JSON' % chave)
-        els += bloco(protos, label, exe[chave], formato, 'execucao.' + chave)
+        els += bloco(protos, label, exe[chave], formato, 'execucao.' + chave, doc)
     return els
 
 
@@ -604,11 +766,11 @@ def monta_customizacoes(doc, protos, cus):
     ], doc))
 
     els += bloco(protos, 'Funcionalidades:', cus['funcionalidades'], 'bullet',
-                 'customizacoes.funcionalidades')
+                 'customizacoes.funcionalidades', doc)
     els += bloco(protos, 'Premissas e restrições técnicas:', cus['premissas_tecnicas'],
-                 'bullet', 'customizacoes.premissas_tecnicas')
+                 'bullet', 'customizacoes.premissas_tecnicas', doc)
     els += bloco(protos, 'Protótipo de tela:', cus['prototipo_tela'], 'p',
-                 'customizacoes.prototipo_tela')
+                 'customizacoes.prototipo_tela', doc)
 
     # Anexos + tabela
     linhas = [['Descrição', 'Observação']]
@@ -673,6 +835,9 @@ def main():
         conteudo = json.load(fh)
     valida(conteudo)
 
+    global BASE_FIGURAS
+    BASE_FIGURAS = os.path.dirname(os.path.abspath(args.json))
+
     if not os.path.isfile(args.template):
         raise SystemExit('template não encontrado: ' + args.template)
 
@@ -711,9 +876,11 @@ def main():
     if quebra_pagina_antes(acha_tabela(doc, 'Dados da Customização', 1)):
         print('quadro "Dados da Customização" começa em página nova')
 
-    els_atu = itens_para_elementos(conteudo['processo_atual'], protos, 'processo_atual')
-    els_pro = itens_para_elementos(conteudo['processo_proposto'], protos, 'processo_proposto')
-    els_par = itens_para_elementos(conteudo['parametrizacoes'], protos, 'parametrizacoes')
+    els_atu = itens_para_elementos(conteudo['processo_atual'], protos, 'processo_atual', doc)
+    els_pro = itens_para_elementos(conteudo['processo_proposto'], protos,
+                                   'processo_proposto', doc)
+    els_par = itens_para_elementos(conteudo['parametrizacoes'], protos,
+                                   'parametrizacoes', doc)
     els_exe = monta_execucao(doc, protos, conteudo['execucao'])
     els_cus = monta_customizacoes(doc, protos, conteudo['customizacoes'])
     if not args.sem_respiro:
@@ -725,6 +892,10 @@ def main():
         respiro(heads['Aceite'], 'inicio')
         # e antes de cada título de seção, no fim da seção anterior
         respiro_entre_secoes([els_atu, els_pro, els_par, els_exe])
+    renomeados = renomeia_secoes(heads, conteudo.get('titulos_secoes'))
+    if renomeados:
+        print('títulos de seção renomeados: %d' % renomeados)
+
     insere_apos(heads['Processo Atual'], els_atu)
     insere_apos(heads['Processo Proposto'], els_pro)
     insere_apos(heads['Parametrizações'], els_par)

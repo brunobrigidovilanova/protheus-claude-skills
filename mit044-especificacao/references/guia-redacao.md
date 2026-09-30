@@ -63,6 +63,54 @@ Depois, bullets de **pré-requisito** (cadastros, TES, parâmetros, séries, est
 - **Anexos**: pares descrição/observação. Use a observação para marcar o que está pendente de
   envio pelo cliente.
 
+## Documento de especificação × documento do que já existe
+
+O guia acima descreve a MIT044 clássica: o que **será** construído, no futuro, para o
+cliente aprovar antes do desenvolvimento. O mesmo esqueleto serve para registrar uma
+customização **já implantada** — e aí duas coisas mudam.
+
+Primeiro o tempo verbal: tudo no presente ("o sistema lê", "a rotina grava"), porque
+descreve comportamento observável, não promessa. Segundo os títulos: "Processo Atual" e
+"Processo Proposto" perdem o sentido, e a chave `titulos_secoes` os troca por nomes como
+"Visão Geral", "Como Funciona Hoje", "Configurações e Pré-requisitos", "Regras de
+Processamento" e "Componentes da Customização".
+
+Deixe explícito no primeiro parágrafo que o documento registra o estado atual e não é uma
+especificação — sem isso o leitor cobra aprovação de algo que já está em produção. O que
+ainda está em aberto continua escrito como pendência, no mesmo lugar de sempre.
+
+## Tabela ou bullet?
+
+Bullet é para regra, condição e premissa — texto que se lê em sequência. **Tabela é para
+inventário**: campo, tabela, parâmetro, índice, fonte, TES, CFOP. Se os itens têm os
+mesmos atributos e o leitor vai comparar um com o outro ou procurar um específico, é
+tabela; em bullets a mesma informação vira um paredão que ninguém confere.
+
+Na prática, viram tabela: campos criados no dicionário (nº, campo, tipo, tamanho, título,
+conteúdo), índices (ordem, chave, uso), parâmetros (nome, tipo, padrão, finalidade),
+tabelas envolvidas (alias, nome, conteúdo) e fontes (nome, tamanho, papel). Continuam em
+bullet: pré-requisitos de cadastro, premissas, restrições e cenários de teste.
+
+Cabeçalho sempre na primeira linha, com o nome do atributo, não uma frase. Conteúdo de
+célula sem ponto final, salvo quando for frase inteira. Número medido, nunca estimado — a
+contagem de linhas de um fonte sai do arquivo, não de memória.
+
+## Fluxogramas
+
+Um diagrama entra quando o texto precisa de duas leituras para se entender: quem faz o
+quê em qual etapa, uma decisão com mais de dois desfechos, a situação de um registro ao
+longo do processamento, a relação entre os componentes. Três a cinco por documento é o
+suficiente; mais que isso costuma indicar diagrama decorativo.
+
+Cada figura responde a uma pergunta só, e a legenda diz qual é. O que a figura mostra
+continua escrito no texto — ela ilustra, não substitui, porque o documento também é lido
+impresso e em preto e branco.
+
+Vocabulário visual (as cores de `scripts/fluxograma.py`): azul para o fluxo normal, cinza
+para o que o sistema faz sozinho, verde para conclusão com sucesso, vermelho para recusa
+ou erro, amarelo para decisão e pendência. Mantenha o mesmo significado em todas as
+figuras do documento.
+
 ## Tamanho de referência
 As MIT044 aprovadas têm ~90 parágrafos de conteúdo e 7 tabelas (capa, histórico de versões, dados
 da customização, periodicidade, rotina, anexos e aceite). Documento muito mais curto costuma

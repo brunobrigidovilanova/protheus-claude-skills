@@ -83,8 +83,9 @@ O gerador já entrega o documento diagramado, sem os retoques que antes eram fei
 | `capa.*` | texto | `nome_cliente`, `codigo_cliente`, `nome_projeto`, `codigo_projeto`, `segmento_cliente`, `unidade_totvs`, `data`, `proposta_comercial`, `gerente_totvs`, `gerente_cliente`, `responsavel_totvs`, `responsavel_cliente`, `qtd_horas` |
 | `capa.extra_projeto` | `sim`/`nao`/`""` | marca o checkbox correspondente |
 | `capa.criticidade` | `alto`/`medio`/`baixo`/`""` | marca o checkbox de criticidade |
+| `titulos_secoes` | objeto (opcional) | renomeia os cinco títulos de seção: `{"Processo Atual": "Visão Geral", …}`. Use ao documentar uma customização **já implantada**, em que "Processo Atual/Proposto" não descrevem mais nada. O sumário continua certo: o campo TOC seleciona por nível, não por nome |
 | `historico` | lista (opcional) | linhas da tabela "Histórico de Versões": `{"data", "versao", "autor", "descricao"}`. Omitido, gera uma linha com a data da capa, versão `1.00`, o responsável TOTVS e "Emissão inicial do documento." |
-| `processo_atual`, `processo_proposto`, `parametrizacoes` | lista | item = texto (parágrafo) ou `{"tipo": "bullet"\|"p"\|"num"\|"label", "texto": "..."}` |
+| `processo_atual`, `processo_proposto`, `parametrizacoes` | lista | item = texto (parágrafo) ou `{"tipo": …}` — ver **Itens de conteúdo** abaixo |
 | `execucao` | objeto | chaves fixas `objetivos`, `fluxo`, `premissas`, `plano_teste` (listas) e `rastreabilidade` (texto) |
 | `customizacoes.periodicidade` | objeto | `sob_demanda`/`job`/`continua` (textos) + `marcada` (qual recebe o "X") |
 | `customizacoes.onde_executada` | objeto | `texto`, `rotina`, `menu` |
@@ -94,6 +95,65 @@ O gerador já entrega o documento diagramado, sem os retoques que antes eram fei
 
 Os **labels em negrito** de cada bloco ("Objetivos do negócio:", "Anexos:"…) são escritos pelo
 gerador — não os coloque no JSON.
+
+## Itens de conteúdo
+
+Toda lista de conteúdo (`processo_atual`, `processo_proposto`, `parametrizacoes`, os
+blocos de `execucao` e os de `customizacoes`) aceita, além da string solta, estes objetos:
+
+| `tipo` | Campos | Resultado |
+|---|---|---|
+| `p` | `texto` | parágrafo narrativo |
+| `bullet` | `texto` | bullet recuado 1 cm |
+| `num` | `texto` | passo numerado (a numeração é contada por lista) |
+| `label` | `texto` | rótulo em negrito que abre um sub-bloco |
+| `tabela` | `linhas`, `titulo`, `larguras`, `fonte` | tabela de N colunas |
+| `figura` | `arquivo`, `legenda`, `largura_cm` | imagem centralizada com legenda |
+
+**Tabela.** `linhas` é uma lista de listas; a **primeira linha é o cabeçalho** e sai em
+negrito. `larguras` é opcional, em centímetros, uma por coluna, e deve somar 16 (a mancha
+da página) — omitida, as colunas ficam iguais. `titulo` vira um rótulo em negrito acima da
+tabela; use quando houver duas ou mais tabelas seguidas no mesmo bloco. O layout é gravado
+como fixo: sem isso o Word reajusta as colunas ao abrir e a largura calculada se perde.
+
+```json
+{"tipo": "tabela", "titulo": "Campos", "larguras": [0.9, 3.0, 1.0, 11.1],
+ "linhas": [["#", "Campo", "Tipo", "Conteúdo"],
+            ["01", "ZC4_ID", "C", "Número do repasse"]]}
+```
+
+**Figura.** `arquivo` é relativo à pasta do JSON. A largura é limitada à mancha da página,
+então gere a imagem já nesse tamanho para não haver redução. A legenda sai em itálico,
+centralizada, 8,5 pt — numere-a no texto (`Figura 1 — …`), porque o gerador não numera.
+
+```json
+{"tipo": "figura", "arquivo": "figuras/fluxo-1-ciclo.png",
+ "legenda": "Figura 1 — Ciclo do repasse: o que é do usuário e o que o agendamento faz."}
+```
+
+## Fluxogramas
+
+`scripts/fluxograma.py` traz as primitivas de desenho (`caixa`, `losango`, `seta`,
+`caminho`, `rotulo`, `faixa`, `salva`) e a paleta. Não é um gerador automático: escreva,
+ao lado do JSON, um script curto que descreve os diagramas daquele documento, rode-o e
+referencie os PNGs pelos itens `figura`. Requer `matplotlib`.
+
+```python
+import sys, os
+sys.path.insert(0, os.path.expanduser(r'~/.claude/skills/mit044-especificacao/scripts'))
+from fluxograma import *
+
+f, ax = figura(4.2)
+caixa(ax, 50, 80, 50, 10, 'Usuário importa a planilha')
+losango(ax, 50, 55, 44, 14, 'Validação\naprovada?')
+caixa(ax, 50, 30, 50, 10, 'Grava os itens', bc=VERDE_B, fc=VERDE_F)
+seta(ax, (50, 75), (50, 62)); seta(ax, (50, 48), (50, 35))
+salva(f, 'fluxo-1-importacao.png')
+```
+
+**Sempre abra o PNG e olhe antes de inserir.** Rótulo de seta encostando em caixa, texto
+maior que a caixa e linha de retorno cruzando outro elemento são os defeitos comuns, e
+nenhum deles aparece no código — só no desenho pronto.
 
 ## Pendências manuais no Word (informe SEMPRE ao usuário)
 
@@ -117,11 +177,15 @@ gerador — não os coloque no JSON.
 | Numeração dos títulos sai "a., b., 01., 02." | herdado dos documentos originais (dois `numId`) | rode com `--numeracao-uniforme` |
 | Espaço dobrado depois dos títulos | template extraído de uma MIT044 já gerada trouxe as quebras do respiro | o gerador limpa sozinho; para o asset, o extrator também |
 | Acentos corrompidos no terminal | console cp1252 | os scripts já forçam UTF-8; não redirecione para arquivo sem `-Encoding utf8` |
+| Colunas da tabela desalinhadas ao abrir no Word | autofit refez as larguras | já corrigido (layout fixo); confira se `larguras` soma 16 cm |
+| Duas tabelas seguidas viraram uma só | o Word funde tabelas coladas | o gerador insere um parágrafo vazio entre elas; não o remova à mão |
+| `figura não encontrada` | caminho relativo a outra pasta | o caminho é relativo à **pasta do JSON**, não à pasta atual |
 
 ## Estrutura da skill
 
 ```
 scripts/gera_mit044.py       gerador (JSON + template -> .docx)
+scripts/fluxograma.py        primitivas para desenhar os fluxogramas (PNG)
 scripts/valida_mit044.py     conferência estrutural (20 verificações)
 scripts/extrai_template.py   recria os assets a partir de uma MIT044 aprovada
 assets/template-mit044.docx  template oficial TOTVS: capa, histórico, sumário, cabeçalho/rodapé
